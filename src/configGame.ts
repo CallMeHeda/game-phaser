@@ -1,9 +1,10 @@
 import Phaser from "phaser";
 
-let background: Phaser.GameObjects.Image;
+// let background: Phaser.GameObjects.Image;
 let player: Phaser.Physics.Arcade.Sprite;
 let platforms: Phaser.Physics.Arcade.StaticGroup;
 let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
+let rightCollideBounds: Phaser.GameObjects.Rectangle | null = null;
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -42,24 +43,23 @@ function preload(this: Phaser.Scene): void {
 }
 
 function create(this: Phaser.Scene): void {
-  background = this.add.image(0, 0, "sky").setOrigin(0, 0);
-  background.setScrollFactor(0);
-
-  platforms = this.physics.add.staticGroup();
-  platforms.create(35, 600, "grassHalfLeft").setScale(1).refreshBody();
-
-  let j = 105;
-  for (let i = 0; i < 10; i++) {
-    platforms.create(j, 600, "grassHalfMid").setScale(1).refreshBody();
-    j += 70;
-  }
-  platforms.create(765, 600, "grassHalfRight").setScale(1).refreshBody();
-
   this.physics.world.gravity.y = 800;
+  this.add.image(0, 0, "sky").setOrigin(0, 0).setScrollFactor(0);
 
   // PLAYER
   player = this.physics.add.sprite(40, 250, "p3_walk2");
   player.setCollideWorldBounds(false);
+
+  // PLATFORMES
+  platforms = this.physics.add.staticGroup();
+  // platforms.create(35, 600, "grassHalfLeft").setScale(1).refreshBody();
+
+  // Écouter l'événement "update" pour ajouter de nouvelles images de plate-forme
+  let j = 0;
+  while (j >= 0 && j <= 700 && player.x >= 40) {
+    addPlatform(); // Ajouter une nouvelle image de plateforms
+    j += 50;
+  }
 
   // Configuration de la collision entre player et platforms
   this.physics.add.collider(player, platforms);
@@ -75,7 +75,7 @@ function create(this: Phaser.Scene): void {
     key: "right",
     frames: frames,
     frameRate: 10,
-    //repeat: -1,
+    // repeat: -1,
   });
 
   this.anims.create({
@@ -86,23 +86,50 @@ function create(this: Phaser.Scene): void {
 }
 
 function update(this: Phaser.Scene): void {
+  let cameraStop = false;
+
   if (this.input.keyboard) {
     cursors = this.input.keyboard.createCursorKeys();
+    const camera = this.cameras.main;
 
     if (player.body && cursors.up.isDown && player.body.touching.down) {
       player.setVelocityY(-500);
       player.anims.play("up", true);
-    } else if (cursors.right.isDown) {
+    } else if (cursors.right.isDown && !cameraStop) {
       player.setVelocityX(90);
-      // Suivi camera du player
-      const camera = this.cameras.main;
+      player.flipX = false;
+      // Suivi camera du player (RIGHT)
       if (player.x > camera.scrollX + 500) {
         const distance = player.x - camera.scrollX - 500;
         const speed = distance / 100;
         camera.setScroll(camera.scrollX + speed, 0);
       }
+      // COLLISION DROITE
+
+      // Déclaration de rightCollideBounds la première fois que la touche droite est appuyée
+      // Create right collision bounds
+      rightCollideBounds = this.add.rectangle(1040, 0, 1, 600);
+      this.physics.add.existing(rightCollideBounds);
+      // rightCollideBounds = this.add.rectangle(1000, 0, 1, 600);
+      this.physics.add.existing(rightCollideBounds);
+      this.physics.add.collider(player, rightCollideBounds, () => {
+        cameraStop = true;
+      });
+
+      // Check if player reached right bounds
+      if (player.x >= 1000) {
+        // console.log("dfd");
+        // const camera = this.cameras.main;
+        cameraStop = true;
+        camera.stopFollow();
+        player.setVelocityX(0);
+      }
+      if (cameraStop === true) {
+        console.log("dfd");
+        camera.setScroll(1040 - 500, 0);
+      }
+
       player.anims.play("right", true);
-      player.flipX = false;
     } else if (cursors.left.isDown) {
       player.setVelocityX(-90);
 
@@ -113,21 +140,13 @@ function update(this: Phaser.Scene): void {
         const speed = distance / 100;
         camera.setScroll(camera.scrollX - speed, 0);
       }
-
       // Création d'un objet invisible pour bloquer le joueur à gauche (collision)
-      const leftBounds: Phaser.GameObjects.Rectangle = this.add.rectangle(
-        -50,
-        600 / 2,
-        100,
-        600,
-        0x000000,
-        0
-      );
-      this.physics.add.existing(leftBounds);
-      leftBounds.setOrigin(0.5);
+      const leftCollideBounds: Phaser.GameObjects.Rectangle =
+        this.add.rectangle(-50, 600 / 2, 100, 600);
+      this.physics.add.existing(leftCollideBounds);
+      // leftCollideBounds.setOrigin(0.5);
       // Configuration de la collision entre player et leftBounds (objet invisible)
-      this.physics.add.collider(player, leftBounds);
-
+      this.physics.add.collider(player, leftCollideBounds);
       player.anims.play("right", true);
       player.flipX = true;
     } else if (player.body && !player.body.touching.down) {
@@ -136,6 +155,30 @@ function update(this: Phaser.Scene): void {
       player.setVelocityX(0);
       player.setTexture("p3_walk2");
     }
+  }
+
+  // if (rightCollideBounds && cameraStop) {
+  //   console.log("test");
+  //   const camera = this.cameras.main;
+  //   if (camera.scrollX < rightCollideBounds.x) {
+  //     const distance = rightCollideBounds.x - camera.scrollX;
+  //     const speed = distance / 100;
+  //     camera.setScroll(camera.scrollX + speed, 0);
+  //   }
+  // }
+}
+
+// Fonction pour ajouter une nouvelle image de plate-forme
+function addPlatform() {
+  let lastPlatform: Phaser.GameObjects.Sprite;
+  if (platforms.getLast(true)) {
+    lastPlatform = platforms.getLast(true); // Récupère la dernière image de platforms ajoutée
+    let x = lastPlatform.x + lastPlatform.displayWidth; // Calculer la position X pour la nouvelle plateforms
+    platforms.create(x, 600, "grassHalfMid").setScale(1).refreshBody(); // Créer une nouvelle image de plateforms
+  } else {
+    lastPlatform = platforms.getLast(false); // Récupère la dernière image de platforms ajoutée
+    let x = 35; // Calculer la position X pour la nouvelle plateforms
+    platforms.create(x, 600, "grassHalfMid").setScale(1).refreshBody(); // Créer une nouvelle image de plateforms
   }
 }
 
