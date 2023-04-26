@@ -4,7 +4,8 @@ import Phaser from "phaser";
 let player: Phaser.Physics.Arcade.Sprite;
 let platforms: Phaser.Physics.Arcade.StaticGroup;
 let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-let rightCollideBounds: Phaser.GameObjects.Rectangle | null = null;
+let rightCollideBounds: Phaser.GameObjects.Rectangle;
+let leftCollideBounds: Phaser.GameObjects.Rectangle;
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -54,7 +55,6 @@ function create(this: Phaser.Scene): void {
   platforms = this.physics.add.staticGroup();
   // platforms.create(35, 600, "grassHalfLeft").setScale(1).refreshBody();
 
-  // Écouter l'événement "update" pour ajouter de nouvelles images de plate-forme
   let j = 0;
   while (j >= 0 && j <= 700 && player.x >= 40) {
     addPlatform(); // Ajouter une nouvelle image de plateforms
@@ -91,6 +91,8 @@ function update(this: Phaser.Scene): void {
   if (this.input.keyboard) {
     cursors = this.input.keyboard.createCursorKeys();
     const camera = this.cameras.main;
+    const rightBoundX = rightCollideBounds.getRightCenter().x;
+    const leftBoundX = leftCollideBounds.getLeftCenter().x;
 
     if (player.body && cursors.up.isDown && player.body.touching.down) {
       player.setVelocityY(-500);
@@ -99,54 +101,54 @@ function update(this: Phaser.Scene): void {
       player.setVelocityX(90);
       player.flipX = false;
       // Suivi camera du player (RIGHT)
-      if (player.x > camera.scrollX + 500) {
-        const distance = player.x - camera.scrollX - 500;
+      if (player.x > camera.scrollX + 500 && player.x <= 1000) {
+        const distance = player.x - camera.scrollX - 610;
         const speed = distance / 100;
         camera.setScroll(camera.scrollX + speed, 0);
       }
       // COLLISION DROITE
-
-      // Déclaration de rightCollideBounds la première fois que la touche droite est appuyée
-      // Create right collision bounds
       rightCollideBounds = this.add.rectangle(1040, 0, 1, 600);
-      this.physics.add.existing(rightCollideBounds);
-      // rightCollideBounds = this.add.rectangle(1000, 0, 1, 600);
       this.physics.add.existing(rightCollideBounds);
       this.physics.add.collider(player, rightCollideBounds, () => {
         cameraStop = true;
       });
 
-      // Check if player reached right bounds
-      if (player.x >= 1000) {
-        // console.log("dfd");
-        // const camera = this.cameras.main;
+      if (rightBoundX && camera.scrollX > rightBoundX) {
         cameraStop = true;
-        camera.stopFollow();
         player.setVelocityX(0);
       }
-      if (cameraStop === true) {
-        console.log("dfd");
-        camera.setScroll(1040 - 500, 0);
+
+      if (cameraStop && rightBoundX) {
+        camera.setScroll(rightBoundX - camera.width / 2);
       }
 
       player.anims.play("right", true);
-    } else if (cursors.left.isDown) {
+    } else if (cursors.left.isDown && !cameraStop) {
       player.setVelocityX(-90);
 
-      // !!! SUIVI CAMERA GAUCHE A REGLER !!!
-      const camera = this.cameras.main;
+      // !!! SUIVI CAMERA GAUCHE !!!
       if (player.x < camera.scrollX + 500 && player.x >= 0) {
-        const distance = camera.scrollX + 500 - player.x;
+        const distance = camera.scrollX + 50 - player.x;
         const speed = distance / 100;
         camera.setScroll(camera.scrollX - speed, 0);
       }
       // Création d'un objet invisible pour bloquer le joueur à gauche (collision)
-      const leftCollideBounds: Phaser.GameObjects.Rectangle =
-        this.add.rectangle(-50, 600 / 2, 100, 600);
+      leftCollideBounds = this.add.rectangle(35, 0, 1, 600);
       this.physics.add.existing(leftCollideBounds);
-      // leftCollideBounds.setOrigin(0.5);
       // Configuration de la collision entre player et leftBounds (objet invisible)
-      this.physics.add.collider(player, leftCollideBounds);
+      this.physics.add.collider(player, leftCollideBounds, () => {
+        cameraStop = true;
+      });
+
+      // console.log(cameraStop + " - " + camera.scrollX);
+      if (leftBoundX && camera.scrollX <= leftBoundX) {
+        cameraStop = true;
+        player.setVelocityX(0);
+      }
+      if (cameraStop && leftBoundX) {
+        camera.setScroll(leftBoundX, 0);
+      }
+
       player.anims.play("right", true);
       player.flipX = true;
     } else if (player.body && !player.body.touching.down) {
@@ -156,16 +158,6 @@ function update(this: Phaser.Scene): void {
       player.setTexture("p3_walk2");
     }
   }
-
-  // if (rightCollideBounds && cameraStop) {
-  //   console.log("test");
-  //   const camera = this.cameras.main;
-  //   if (camera.scrollX < rightCollideBounds.x) {
-  //     const distance = rightCollideBounds.x - camera.scrollX;
-  //     const speed = distance / 100;
-  //     camera.setScroll(camera.scrollX + speed, 0);
-  //   }
-  // }
 }
 
 // Fonction pour ajouter une nouvelle image de plate-forme
