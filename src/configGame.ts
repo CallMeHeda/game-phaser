@@ -4,8 +4,8 @@ import Phaser from "phaser";
 let player: Phaser.Physics.Arcade.Sprite;
 let platforms: Phaser.Physics.Arcade.StaticGroup;
 let cursors: Phaser.Types.Input.Keyboard.CursorKeys;
-let rightCollideBounds: Phaser.GameObjects.Rectangle;
-let leftCollideBounds: Phaser.GameObjects.Rectangle;
+let rightCollideBounds: Phaser.GameObjects.Rectangle | null = null;
+let leftCollideBounds: Phaser.GameObjects.Rectangle | null = null;
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -91,13 +91,11 @@ function update(this: Phaser.Scene): void {
   if (this.input.keyboard) {
     cursors = this.input.keyboard.createCursorKeys();
     const camera = this.cameras.main;
-    const rightBoundX = rightCollideBounds.getRightCenter().x;
-    const leftBoundX = leftCollideBounds.getLeftCenter().x;
 
     if (player.body && cursors.up.isDown && player.body.touching.down) {
       player.setVelocityY(-500);
       player.anims.play("up", true);
-    } else if (cursors.right.isDown && !cameraStop) {
+    } else if (cursors.right.isDown && !cameraStop && !cursors.up.isDown) {
       player.setVelocityX(90);
       player.flipX = false;
       // Suivi camera du player (RIGHT)
@@ -112,7 +110,7 @@ function update(this: Phaser.Scene): void {
       this.physics.add.collider(player, rightCollideBounds, () => {
         cameraStop = true;
       });
-
+      const rightBoundX = rightCollideBounds.getRightCenter().x;
       if (rightBoundX && camera.scrollX > rightBoundX) {
         cameraStop = true;
         player.setVelocityX(0);
@@ -123,7 +121,7 @@ function update(this: Phaser.Scene): void {
       }
 
       player.anims.play("right", true);
-    } else if (cursors.left.isDown && !cameraStop) {
+    } else if (cursors.left.isDown && !cameraStop && !cursors.up.isDown) {
       player.setVelocityX(-90);
 
       // !!! SUIVI CAMERA GAUCHE !!!
@@ -141,6 +139,7 @@ function update(this: Phaser.Scene): void {
       });
 
       // console.log(cameraStop + " - " + camera.scrollX);
+      const leftBoundX = leftCollideBounds.getLeftCenter().x;
       if (leftBoundX && camera.scrollX <= leftBoundX) {
         cameraStop = true;
         player.setVelocityX(0);
@@ -151,7 +150,13 @@ function update(this: Phaser.Scene): void {
 
       player.anims.play("right", true);
       player.flipX = true;
-    } else if (player.body && !player.body.touching.down) {
+    } else if (
+      (player.body && !player.body.touching.down) ||
+      cursors.right.isDown ||
+      cursors.up.isDown ||
+      cursors.left.isDown ||
+      cursors.up.isDown
+    ) {
       player.setTexture("p3_jump");
     } else {
       player.setVelocityX(0);
